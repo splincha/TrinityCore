@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -39,20 +39,22 @@ class npc_pet_gen_mojo : public CreatureScript
 
         struct npc_pet_gen_mojoAI : public ScriptedAI
         {
-            npc_pet_gen_mojoAI(Creature* creature) : ScriptedAI(creature) { }
-
-            void Reset() OVERRIDE
+            npc_pet_gen_mojoAI(Creature* creature) : ScriptedAI(creature)
             {
-                _victimGUID = 0;
+            }
+
+            void Reset() override
+            {
+                _victimGUID.Clear();
 
                 if (Unit* owner = me->GetOwner())
                     me->GetMotionMaster()->MoveFollow(owner, 0.0f, 0.0f);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE { }
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void EnterCombat(Unit* /*who*/) override { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
-            void ReceiveEmote(Player* player, uint32 emote) OVERRIDE
+            void ReceiveEmote(Player* player, uint32 emote) override
             {
                 me->HandleEmoteCommand(emote);
                 Unit* owner = me->GetOwner();
@@ -62,9 +64,9 @@ class npc_pet_gen_mojo : public CreatureScript
                     return;
                 }
 
-                Talk(SAY_MOJO, player->GetGUID());
+                Talk(SAY_MOJO, player);
 
-                if (_victimGUID)
+                if (!_victimGUID.IsEmpty())
                     if (Player* victim = ObjectAccessor::GetPlayer(*me, _victimGUID))
                         victim->RemoveAura(SPELL_FEELING_FROGGY);
 
@@ -76,10 +78,10 @@ class npc_pet_gen_mojo : public CreatureScript
             }
 
         private:
-            uint64 _victimGUID;
+            ObjectGuid _victimGUID;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_pet_gen_mojoAI(creature);
         }

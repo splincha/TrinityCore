@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,7 +21,6 @@
 #include "PassiveAI.h"
 
 #include "MovementGenerator.h"
-#include "Pet.h"
 #include "TemporarySummon.h"
 #include "CreatureAIFactory.h"
 #include "ScriptMgr.h"
@@ -31,7 +30,7 @@ namespace FactorySelector
     CreatureAI* selectAI(Creature* creature)
     {
         const CreatureAICreator* ai_factory = NULL;
-        CreatureAIRegistry& ai_registry(*CreatureAIRepository::instance());
+        CreatureAIRegistry& ai_registry(*CreatureAIRegistry::instance());
 
         if (creature->IsPet())
             ai_factory = ai_registry.GetRegistryItem("PetAI");
@@ -53,7 +52,7 @@ namespace FactorySelector
                 ai_factory = ai_registry.GetRegistryItem("VehicleAI");
             else if (creature->HasUnitTypeMask(UNIT_MASK_CONTROLABLE_GUARDIAN) && ((Guardian*)creature)->GetOwner()->GetTypeId() == TYPEID_PLAYER)
                 ai_factory = ai_registry.GetRegistryItem("PetAI");
-            else if (creature->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK))
+            else if (creature->HasFlag64(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK))
                 ai_factory = ai_registry.GetRegistryItem("NullCreatureAI");
             else if (creature->IsGuard())
                 ai_factory = ai_registry.GetRegistryItem("GuardAI");
@@ -68,7 +67,7 @@ namespace FactorySelector
                 else
                     ai_factory = ai_registry.GetRegistryItem("NullCreatureAI");
             }
-            else if (creature->GetCreatureType() == CREATURE_TYPE_CRITTER && !creature->HasUnitTypeMask(UNIT_MASK_GUARDIAN))
+            else if (creature->IsCritter() && !creature->HasUnitTypeMask(UNIT_MASK_GUARDIAN))
                 ai_factory = ai_registry.GetRegistryItem("CritterAI");
         }
 
@@ -95,13 +94,13 @@ namespace FactorySelector
         // select NullCreatureAI if not another cases
         ainame = (ai_factory == NULL) ? "NullCreatureAI" : ai_factory->key();
 
-        TC_LOG_DEBUG(LOG_FILTER_TSCR, "Creature %s (Entry: %u GUID: %u DB GUID: %u) is using AI type: %s.", creature->GetName().c_str(), creature->GetEntry(), creature->GetGUIDLow(), creature->GetDBTableGUIDLow(), ainame.c_str());
+        TC_LOG_DEBUG("scripts", "Creature %s (%s DB GUID: " UI64FMTD ") is using AI type: %s.", creature->GetName().c_str(), creature->GetGUID().ToString().c_str(), creature->GetSpawnId(), ainame.c_str());
         return (ai_factory == NULL ? new NullCreatureAI(creature) : ai_factory->Create(creature));
     }
 
     MovementGenerator* selectMovementGenerator(Creature* creature)
     {
-        MovementGeneratorRegistry& mv_registry(*MovementGeneratorRepository::instance());
+        MovementGeneratorRegistry& mv_registry(*MovementGeneratorRegistry::instance());
         ASSERT(creature->GetCreatureTemplate());
         const MovementGeneratorCreator* mv_factory = mv_registry.GetRegistryItem(creature->GetDefaultMovementType());
 
@@ -130,7 +129,7 @@ namespace FactorySelector
     GameObjectAI* SelectGameObjectAI(GameObject* go)
     {
         const GameObjectAICreator* ai_factory = NULL;
-        GameObjectAIRegistry& ai_registry(*GameObjectAIRepository::instance());
+        GameObjectAIRegistry& ai_registry(*GameObjectAIRegistry::instance());
 
         // scriptname in db
         if (GameObjectAI* scriptedAI = sScriptMgr->GetGameObjectAI(go))
@@ -142,9 +141,8 @@ namespace FactorySelector
 
         std::string ainame = (ai_factory == NULL || go->GetScriptId()) ? "NullGameObjectAI" : ai_factory->key();
 
-        TC_LOG_DEBUG(LOG_FILTER_TSCR, "GameObject %u used AI is %s.", go->GetGUIDLow(), ainame.c_str());
+        TC_LOG_DEBUG("scripts", "%s used AI is %s.", go->GetGUID().ToString().c_str(), ainame.c_str());
 
         return (ai_factory == NULL ? new NullGameObjectAI(go) : ai_factory->Create(go));
     }
 }
-

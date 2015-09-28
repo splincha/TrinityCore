@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -45,32 +45,40 @@ class boss_ironaya : public CreatureScript
 
         struct boss_ironayaAI : public ScriptedAI
         {
-            boss_ironayaAI(Creature* creature) : ScriptedAI(creature) {}
-
-            uint32 uiArcingTimer;
-            bool bHasCastedWstomp;
-            bool bHasCastedKnockaway;
-
-            void Reset() OVERRIDE
+            boss_ironayaAI(Creature* creature) : ScriptedAI(creature)
             {
-                uiArcingTimer = 3000;
-                bHasCastedKnockaway = false;
-                bHasCastedWstomp = false;
+                Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void Initialize()
+            {
+                uiArcingTimer = 3000;
+                bHasCastKnockaway = false;
+                bHasCastWstomp = false;
+            }
+
+            uint32 uiArcingTimer;
+            bool bHasCastWstomp;
+            bool bHasCastKnockaway;
+
+            void Reset() override
+            {
+                Initialize();
+            }
+
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
             }
 
-            void UpdateAI(uint32 uiDiff) OVERRIDE
+            void UpdateAI(uint32 uiDiff) override
             {
                 //Return since we have no target
                 if (!UpdateVictim())
                     return;
 
                 //If we are <50% hp do knockaway ONCE
-                if (!bHasCastedKnockaway && HealthBelowPct(50))
+                if (!bHasCastKnockaway && HealthBelowPct(50))
                 {
                     DoCastVictim(SPELL_KNOCKAWAY, true);
 
@@ -84,7 +92,7 @@ class boss_ironaya : public CreatureScript
                         me->TauntApply(target);
 
                     //Shouldn't cast this agian
-                    bHasCastedKnockaway = true;
+                    bHasCastKnockaway = true;
                 }
 
                 //uiArcingTimer
@@ -94,17 +102,17 @@ class boss_ironaya : public CreatureScript
                     uiArcingTimer = 13000;
                 } else uiArcingTimer -= uiDiff;
 
-                if (!bHasCastedWstomp && HealthBelowPct(25))
+                if (!bHasCastWstomp && HealthBelowPct(25))
                 {
                     DoCast(me, SPELL_WSTOMP);
-                    bHasCastedWstomp = true;
+                    bHasCastWstomp = true;
                 }
 
                 DoMeleeAttackIfReady();
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new boss_ironayaAI(creature);
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,17 +22,18 @@
 #include "Define.h"
 #include <string>
 #include <list>
+#include <openssl/md5.h>
 
 struct AddonInfo
 {
     AddonInfo(const std::string& name, uint8 enabled, uint32 crc, uint8 state, bool crcOrPubKey)
-        : Name(name), Enabled(enabled), CRC(crc), State(state), UsePublicKeyOrCRC(crcOrPubKey)
+        : Name(name), Enabled(enabled), CRC(crc), Status(state), UsePublicKeyOrCRC(crcOrPubKey)
         { }
 
     std::string Name;
     uint8 Enabled;
     uint32 CRC;
-    uint8 State;
+    uint8 Status;
     bool UsePublicKeyOrCRC;
 };
 
@@ -50,8 +51,8 @@ struct SavedAddon
 struct BannedAddon
 {
     uint32 Id;
-    uint8 NameMD5[16];
-    uint8 VersionMD5[16];
+    uint8 NameMD5[MD5_DIGEST_LENGTH];
+    uint8 VersionMD5[MD5_DIGEST_LENGTH];
     uint32 Timestamp;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,9 +20,8 @@
 #define _ACCMGR_H
 
 #include "RBAC.h"
-#include <ace/Singleton.h>
 
-enum AccountOpResult
+enum class AccountOpResult : uint8
 {
     AOR_OK,
     AOR_NAME_TOO_LONG,
@@ -30,7 +29,8 @@ enum AccountOpResult
     AOR_EMAIL_TOO_LONG,
     AOR_NAME_ALREADY_EXIST,
     AOR_NAME_NOT_EXIST,
-    AOR_DB_INTERNAL_ERROR
+    AOR_DB_INTERNAL_ERROR,
+    AOR_ACCOUNT_BAD_LINK
 };
 
 enum PasswordChangeSecurity
@@ -40,27 +40,30 @@ enum PasswordChangeSecurity
     PW_RBAC
 };
 
+#define MAX_PASS_STR 16
 #define MAX_ACCOUNT_STR 16
 #define MAX_EMAIL_STR 64
 
 namespace rbac
 {
 typedef std::map<uint32, rbac::RBACPermission*> RBACPermissionsContainer;
-typedef std::map<uint32, rbac::RBACRole*> RBACRolesContainer;
-typedef std::map<uint32, rbac::RBACGroup*> RBACGroupsContainer;
-typedef std::map<uint32, rbac::RBACGroupContainer> RBACDefaultSecurityGroupContainer;
+typedef std::map<uint8, rbac::RBACPermissionContainer> RBACDefaultPermissionsContainer;
 }
 
 class AccountMgr
 {
-    friend class ACE_Singleton<AccountMgr, ACE_Null_Mutex>;
-
     private:
         AccountMgr();
         ~AccountMgr();
 
     public:
-        AccountOpResult CreateAccount(std::string username, std::string password, std::string email);
+        static AccountMgr* instance()
+        {
+            static AccountMgr instance;
+            return &instance;
+        }
+
+        AccountOpResult CreateAccount(std::string username, std::string password, std::string email = "", uint32 bnetAccountId = 0, uint8 bnetIndex = 0);
         static AccountOpResult DeleteAccount(uint32 accountId);
         static AccountOpResult ChangeUsername(uint32 accountId, std::string newUsername, std::string newPassword);
         static AccountOpResult ChangePassword(uint32 accountId, std::string newPassword);
@@ -77,7 +80,6 @@ class AccountMgr
         static uint32 GetCharactersCount(uint32 accountId);
 
         static std::string CalculateShaPassHash(std::string const& name, std::string const& password);
-        static bool normalizeString(std::string& utf8String);
         static bool IsPlayerAccount(uint32 gmlevel);
         static bool IsAdminAccount(uint32 gmlevel);
         static bool IsConsoleAccount(uint32 gmlevel);
@@ -86,22 +88,16 @@ class AccountMgr
         void UpdateAccountAccess(rbac::RBACData* rbac, uint32 accountId, uint8 securityLevel, int32 realmId);
 
         void LoadRBAC();
-        rbac::RBACGroup const* GetRBACGroup(uint32 group) const;
-        rbac::RBACRole const* GetRBACRole(uint32 role) const;
         rbac::RBACPermission const* GetRBACPermission(uint32 permission) const;
 
-        rbac::RBACGroupsContainer const& GetRBACGroupList() const { return _groups; }
-        rbac::RBACRolesContainer const& GetRBACRoleList() const { return _roles; }
         rbac::RBACPermissionsContainer const& GetRBACPermissionList() const { return _permissions; }
-        rbac::RBACGroupContainer const& GetRBACDefaultGroups(uint8 secLevel) { return _defaultSecGroups[secLevel]; }
+        rbac::RBACPermissionContainer const& GetRBACDefaultPermissions(uint8 secLevel);
 
     private:
         void ClearRBAC();
         rbac::RBACPermissionsContainer _permissions;
-        rbac::RBACRolesContainer _roles;
-        rbac::RBACGroupsContainer _groups;
-        rbac::RBACDefaultSecurityGroupContainer _defaultSecGroups;
+        rbac::RBACDefaultPermissionsContainer _defaultPermissions;
 };
 
-#define sAccountMgr ACE_Singleton<AccountMgr, ACE_Null_Mutex>::instance()
+#define sAccountMgr AccountMgr::instance()
 #endif

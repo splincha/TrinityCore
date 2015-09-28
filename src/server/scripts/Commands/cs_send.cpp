@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,7 +27,7 @@ class send_commandscript : public CommandScript
 public:
     send_commandscript() : CommandScript("send_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand sendCommandTable[] =
         {
@@ -51,7 +51,7 @@ public:
     {
         // format: name "subject text" "mail text"
         Player* target;
-        uint64 targetGuid;
+        ObjectGuid targetGuid;
         std::string targetName;
         if (!handler->extractPlayerTarget((char*)args, &target, &targetGuid, &targetName))
             return false;
@@ -77,12 +77,12 @@ public:
         std::string text    = msgText;
 
         // from console show not existed sender
-        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUIDLow() : 0, MAIL_STATIONERY_GM);
+        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUID().GetCounter() : UI64LIT(0), MAIL_STATIONERY_GM);
 
         /// @todo Fix poor design
         SQLTransaction trans = CharacterDatabase.BeginTransaction();
         MailDraft(subject, text)
-            .SendMailTo(trans, MailReceiver(target, GUID_LOPART(targetGuid)), sender);
+            .SendMailTo(trans, MailReceiver(target, targetGuid.GetCounter()), sender);
 
         CharacterDatabase.CommitTransaction(trans);
 
@@ -96,7 +96,7 @@ public:
     {
         // format: name "subject text" "mail text" item1[:count1] item2[:count2] ... item12[:count12]
         Player* receiver;
-        uint64 receiverGuid;
+        ObjectGuid receiverGuid;
         std::string receiverName;
         if (!handler->extractPlayerTarget((char*)args, &receiver, &receiverGuid, &receiverName))
             return false;
@@ -152,7 +152,7 @@ public:
             }
 
             uint32 itemCount = itemCountStr ? atoi(itemCountStr) : 1;
-            if (itemCount < 1 || (item_proto->MaxCount > 0 && itemCount > uint32(item_proto->MaxCount)))
+            if (itemCount < 1 || (item_proto->GetMaxCount() > 0 && itemCount > uint32(item_proto->GetMaxCount())))
             {
                 handler->PSendSysMessage(LANG_COMMAND_INVALID_ITEM_COUNT, itemCount, itemId);
                 handler->SetSentErrorMessage(true);
@@ -176,7 +176,7 @@ public:
         }
 
         // from console show not existed sender
-        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUIDLow() : 0, MAIL_STATIONERY_GM);
+        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUID().GetCounter() : UI64LIT(0), MAIL_STATIONERY_GM);
 
         // fill mail
         MailDraft draft(subject, text);
@@ -192,7 +192,7 @@ public:
             }
         }
 
-        draft.SendMailTo(trans, MailReceiver(receiver, GUID_LOPART(receiverGuid)), sender);
+        draft.SendMailTo(trans, MailReceiver(receiver, receiverGuid.GetCounter()), sender);
         CharacterDatabase.CommitTransaction(trans);
 
         std::string nameLink = handler->playerLink(receiverName);
@@ -205,7 +205,7 @@ public:
         /// format: name "subject text" "mail text" money
 
         Player* receiver;
-        uint64 receiverGuid;
+        ObjectGuid receiverGuid;
         std::string receiverName;
         if (!handler->extractPlayerTarget((char*)args, &receiver, &receiverGuid, &receiverName))
             return false;
@@ -236,13 +236,13 @@ public:
         std::string text    = msgText;
 
         // from console show not existed sender
-        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUIDLow() : 0, MAIL_STATIONERY_GM);
+        MailSender sender(MAIL_NORMAL, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUID().GetCounter() : UI64LIT(0), MAIL_STATIONERY_GM);
 
         SQLTransaction trans = CharacterDatabase.BeginTransaction();
 
         MailDraft(subject, text)
             .AddMoney(money)
-            .SendMailTo(trans, MailReceiver(receiver, GUID_LOPART(receiverGuid)), sender);
+            .SendMailTo(trans, MailReceiver(receiver, receiverGuid.GetCounter()), sender);
 
         CharacterDatabase.CommitTransaction(trans);
 
@@ -271,9 +271,8 @@ public:
         }
 
         /// - Send the message
-        // Use SendAreaTriggerMessage for fastest delivery.
-        player->GetSession()->SendAreaTriggerMessage("%s", msgStr);
-        player->GetSession()->SendAreaTriggerMessage("|cffff0000[Message from administrator]:|r");
+        player->GetSession()->SendNotification("%s", msgStr);
+        player->GetSession()->SendNotification("|cffff0000[Message from administrator]:|r");
 
         // Confirmation message
         std::string nameLink = handler->GetNameLink(player);

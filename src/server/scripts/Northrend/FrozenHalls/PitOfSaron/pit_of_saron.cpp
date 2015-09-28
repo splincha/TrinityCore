@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -49,18 +49,18 @@ class npc_ymirjar_flamebearer : public CreatureScript
             {
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _events.Reset();
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 _events.ScheduleEvent(EVENT_FIREBALL, 4000);
                 _events.ScheduleEvent(EVENT_TACTICAL_BLINK, 15000);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -97,7 +97,7 @@ class npc_ymirjar_flamebearer : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_ymirjar_flamebearerAI(creature);
         }
@@ -110,22 +110,28 @@ class npc_iceborn_protodrake : public CreatureScript
 
         struct npc_iceborn_protodrakeAI: public ScriptedAI
         {
-            npc_iceborn_protodrakeAI(Creature* creature) : ScriptedAI(creature), _vehicle(creature->GetVehicleKit())
+            npc_iceborn_protodrakeAI(Creature* creature) : ScriptedAI(creature)
             {
-                ASSERT(_vehicle);
+                Initialize();
             }
 
-            void Reset() OVERRIDE
+            void Initialize()
             {
                 _frostBreathCooldown = 5000;
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void Reset() override
             {
-                _vehicle->RemoveAllPassengers();
+                Initialize();
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
+            {
+                if (Vehicle* _vehicle = me->GetVehicleKit())
+                    _vehicle->RemoveAllPassengers();
+            }
+
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -142,11 +148,10 @@ class npc_iceborn_protodrake : public CreatureScript
             }
 
         private:
-            Vehicle* _vehicle;
             uint32 _frostBreathCooldown;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_iceborn_protodrakeAI(creature);
         }
@@ -161,14 +166,20 @@ class npc_geist_ambusher : public CreatureScript
         {
             npc_geist_ambusherAI(Creature* creature) : ScriptedAI(creature)
             {
+                Initialize();
             }
 
-            void Reset() OVERRIDE
+            void Initialize()
             {
                 _leapingFaceMaulCooldown = 9000;
             }
 
-            void EnterCombat(Unit* who) OVERRIDE
+            void Reset() override
+            {
+                Initialize();
+            }
+
+            void EnterCombat(Unit* who) override
             {
                 if (who->GetTypeId() != TYPEID_PLAYER)
                     return;
@@ -178,7 +189,7 @@ class npc_geist_ambusher : public CreatureScript
                     DoCast(who, SPELL_LEAPING_FACE_MAUL);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -199,7 +210,7 @@ class npc_geist_ambusher : public CreatureScript
             uint32 _leapingFaceMaulCooldown;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_geist_ambusherAI(creature);
         }
@@ -218,18 +229,18 @@ class spell_trash_npc_glacial_strike : public SpellScriptLoader
             {
                 if (GetTarget()->IsFullHealth())
                 {
-                    GetTarget()->RemoveAura(GetId(), 0, 0, AURA_REMOVE_BY_ENEMY_SPELL);
+                    GetTarget()->RemoveAura(GetId(), ObjectGuid::Empty, 0, AURA_REMOVE_BY_ENEMY_SPELL);
                     PreventDefaultAction();
                 }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_trash_npc_glacial_strike_AuraScript::PeriodicTick, EFFECT_2, SPELL_AURA_PERIODIC_DAMAGE_PERCENT);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_trash_npc_glacial_strike_AuraScript();
         }

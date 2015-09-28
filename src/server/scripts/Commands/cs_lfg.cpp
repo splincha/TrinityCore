@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,7 +27,7 @@ void GetPlayerInfo(ChatHandler* handler, Player* player)
     if (!player)
         return;
 
-    uint64 guid = player->GetGUID();
+    ObjectGuid guid = player->GetGUID();
     lfg::LfgDungeonSet dungeons = sLFGMgr->GetSelectedDungeons(guid);
 
     std::string const& state = lfg::GetStateString(sLFGMgr->GetState(guid));
@@ -41,21 +41,21 @@ class lfg_commandscript : public CommandScript
 public:
     lfg_commandscript() : CommandScript("lfg_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand lfgCommandTable[] =
         {
             {  "player", rbac::RBAC_PERM_COMMAND_LFG_PLAYER,  false, &HandleLfgPlayerInfoCommand, "", NULL },
             {   "group", rbac::RBAC_PERM_COMMAND_LFG_GROUP,   false, &HandleLfgGroupInfoCommand,  "", NULL },
-            {   "queue", rbac::RBAC_PERM_COMMAND_LFG_QUEUE,   false, &HandleLfgQueueInfoCommand,  "", NULL },
-            {   "clean", rbac::RBAC_PERM_COMMAND_LFG_CLEAN,   false, &HandleLfgCleanCommand,      "", NULL },
-            { "options", rbac::RBAC_PERM_COMMAND_LFG_OPTIONS, false, &HandleLfgOptionsCommand,    "", NULL },
+            {   "queue", rbac::RBAC_PERM_COMMAND_LFG_QUEUE,   true,  &HandleLfgQueueInfoCommand,  "", NULL },
+            {   "clean", rbac::RBAC_PERM_COMMAND_LFG_CLEAN,   true,  &HandleLfgCleanCommand,      "", NULL },
+            { "options", rbac::RBAC_PERM_COMMAND_LFG_OPTIONS, true,  &HandleLfgOptionsCommand,    "", NULL },
             {      NULL, 0, false,                       NULL, "", NULL }
         };
 
         static ChatCommand commandTable[] =
         {
-            { "lfg", rbac::RBAC_PERM_COMMAND_LFG, false, NULL, "", lfgCommandTable },
+            { "lfg", rbac::RBAC_PERM_COMMAND_LFG, true, NULL, "", lfgCommandTable },
             {  NULL,                     0, false, NULL, "", NULL }
         };
         return commandTable;
@@ -86,7 +86,7 @@ public:
             return true;
         }
 
-        uint64 guid = grp->GetGUID();
+        ObjectGuid guid = grp->GetGUID();
         std::string const& state = lfg::GetStateString(sLFGMgr->GetState(guid));
         handler->PSendSysMessage(LANG_LFG_GROUP_INFO, grp->isLFGGroup(),
             state.c_str(), sLFGMgr->GetDungeon(guid));
@@ -118,7 +118,7 @@ public:
 
     static bool HandleLfgQueueInfoCommand(ChatHandler* handler, char const* args)
     {
-        handler->SendSysMessage(sLFGMgr->DumpQueueInfo(*args).c_str());
+        handler->SendSysMessage(sLFGMgr->DumpQueueInfo(*args != '\0').c_str(), true);
         return true;
     }
 

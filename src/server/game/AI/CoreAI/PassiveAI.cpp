@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,7 +18,6 @@
 
 #include "PassiveAI.h"
 #include "Creature.h"
-#include "TemporarySummon.h"
 
 PassiveAI::PassiveAI(Creature* c) : CreatureAI(c) { me->SetReactState(REACT_PASSIVE); }
 PossessedAI::PossessedAI(Creature* c) : CreatureAI(c) { me->SetReactState(REACT_PASSIVE); }
@@ -49,14 +48,14 @@ void PossessedAI::UpdateAI(uint32 /*diff*/)
 void PossessedAI::JustDied(Unit* /*u*/)
 {
     // We died while possessed, disable our loot
-    me->RemoveFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
+    me->RemoveFlag(OBJECT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
 }
 
 void PossessedAI::KilledUnit(Unit* victim)
 {
     // We killed a creature, disable victim's loot
     if (victim->GetTypeId() == TYPEID_UNIT)
-        victim->RemoveFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
+        victim->RemoveFlag(OBJECT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
 }
 
 void CritterAI::DamageTaken(Unit* /*done_by*/, uint32&)
@@ -75,5 +74,5 @@ void CritterAI::EnterEvadeMode()
 void TriggerAI::IsSummonedBy(Unit* summoner)
 {
     if (me->m_spells[0])
-        me->CastSpell(me, me->m_spells[0], false, 0, 0, summoner->GetGUID());
+        me->CastSpell(me, me->m_spells[0], false, nullptr, nullptr, summoner->GetGUID());
 }

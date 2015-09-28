@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,9 +25,9 @@
 
 enum HunterSpells
 {
-    SPELL_HUNTER_CRIPPLING_POISON       = 30981,   // Viper
-    SPELL_HUNTER_DEADLY_POISON          = 34655,   // Venomous Snake
-    SPELL_HUNTER_MIND_NUMBING_POISON    = 25810    // Viper
+    SPELL_HUNTER_CRIPPLING_POISON       = 30981, // Viper
+    SPELL_HUNTER_DEADLY_POISON_PASSIVE  = 34657, // Venomous Snake
+    SPELL_HUNTER_MIND_NUMBING_POISON    = 25810  // Viper
 };
 
 enum HunterCreatures
@@ -42,13 +42,22 @@ class npc_pet_hunter_snake_trap : public CreatureScript
 
         struct npc_pet_hunter_snake_trapAI : public ScriptedAI
         {
-            npc_pet_hunter_snake_trapAI(Creature* creature) : ScriptedAI(creature) { }
+            npc_pet_hunter_snake_trapAI(Creature* creature) : ScriptedAI(creature)
+            {
+                Initialize();
+            }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE { }
-
-            void Reset() OVERRIDE
+            void Initialize()
             {
                 _spellTimer = 0;
+                _isViper = false;
+            }
+
+            void EnterCombat(Unit* /*who*/) override { }
+
+            void Reset() override
+            {
+                Initialize();
 
                 CreatureTemplate const* Info = me->GetCreatureTemplate();
 
@@ -56,19 +65,22 @@ class npc_pet_hunter_snake_trap : public CreatureScript
 
                 me->SetMaxHealth(uint32(107 * (me->getLevel() - 40) * 0.025f));
                 // Add delta to make them not all hit the same time
-                uint32 delta = (rand() % 7) * 100;
-                me->SetStatFloatValue(UNIT_FIELD_BASEATTACKTIME, float(Info->baseattacktime + delta));
-                me->SetStatFloatValue(UNIT_FIELD_RANGED_ATTACK_POWER, float(Info->attackpower));
+                uint32 delta = (rand32() % 7) * 100;
+                me->SetAttackTime(BASE_ATTACK, Info->BaseAttackTime + delta);
+                //me->SetStatFloatValue(UNIT_FIELD_RANGED_ATTACK_POWER, float(Info->attackpower));
 
                 // Start attacking attacker of owner on first ai update after spawn - move in line of sight may choose better target
                 if (!me->GetVictim() && me->IsSummon())
                     if (Unit* Owner = me->ToTempSummon()->GetSummoner())
                         if (Owner->getAttackerForHelper())
                             AttackStart(Owner->getAttackerForHelper());
+
+                if (!_isViper)
+                    DoCast(me, SPELL_HUNTER_DEADLY_POISON_PASSIVE, true);
             }
 
             // Redefined for random target selection:
-            void MoveInLineOfSight(Unit* who) OVERRIDE
+            void MoveInLineOfSight(Unit* who) override
             {
                 if (!me->GetVictim() && me->CanCreatureAttack(who))
                 {
@@ -78,53 +90,40 @@ class npc_pet_hunter_snake_trap : public CreatureScript
                     float attackRadius = me->GetAttackDistance(who);
                     if (me->IsWithinDistInMap(who, attackRadius) && me->IsWithinLOSInMap(who))
                     {
-                        if (!(rand() % 5))
+                        if (!(rand32() % 5))
                         {
-                            me->setAttackTimer(BASE_ATTACK, (rand() % 10) * 100);
-                            _spellTimer = (rand() % 10) * 100;
+                            me->setAttackTimer(BASE_ATTACK, (rand32() % 10) * 100);
+                            _spellTimer = (rand32() % 10) * 100;
                             AttackStart(who);
                         }
                     }
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
-                if (!UpdateVictim())
+                if (!UpdateVictim() || !me->GetVictim())
                     return;
 
-                if (me->GetVictim()->HasBreakableByDamageCrowdControlAura(me))
+                if (me->EnsureVictim()->HasBreakableByDamageCrowdControlAura(me))
                 {
                     me->InterruptNonMeleeSpells(false);
                     return;
                 }
 
-                if (_spellTimer <= diff)
+                // Viper
+                if (_isViper)
                 {
-                    if (_isViper) // Viper
+                    if (_spellTimer <= diff)
                     {
-                        if (urand(0, 2) == 0) //33% chance to cast
-                        {
-                            uint32 spell;
-                            if (urand(0, 1) == 0)
-                                spell = SPELL_HUNTER_MIND_NUMBING_POISON;
-                            else
-                                spell = SPELL_HUNTER_CRIPPLING_POISON;
-
-                            DoCastVictim(spell);
-                        }
+                        if (urand(0, 2) == 0) // 33% chance to cast
+                            DoCastVictim(RAND(SPELL_HUNTER_MIND_NUMBING_POISON, SPELL_HUNTER_CRIPPLING_POISON));
 
                         _spellTimer = 3000;
                     }
-                    else // Venomous Snake
-                    {
-                        if (urand(0, 2) == 0) // 33% chance to cast
-                            DoCastVictim(SPELL_HUNTER_DEADLY_POISON);
-                        _spellTimer = 1500 + (rand() % 5) * 100;
-                    }
+                    else
+                        _spellTimer -= diff;
                 }
-                else
-                    _spellTimer -= diff;
 
                 DoMeleeAttackIfReady();
             }
@@ -134,7 +133,7 @@ class npc_pet_hunter_snake_trap : public CreatureScript
             uint32 _spellTimer;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_pet_hunter_snake_trapAI(creature);
         }

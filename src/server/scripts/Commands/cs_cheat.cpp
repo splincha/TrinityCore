@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -33,7 +33,7 @@ class cheat_commandscript : public CommandScript
 public:
     cheat_commandscript() : CommandScript("cheat_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
 
         static ChatCommand cheatCommandTable[] =
@@ -185,10 +185,11 @@ public:
 
         std::string argstr = (char*)args;
 
+        Player* target = handler->GetSession()->GetPlayer();
         if (!*args)
         {
-            argstr = (handler->GetSession()->GetPlayer()->GetCommandStatus(CHEAT_WATERWALK)) ? "off" : "on";
-            if (handler->GetSession()->GetPlayer()->GetCommandStatus(CHEAT_WATERWALK))
+            argstr = (target->GetCommandStatus(CHEAT_WATERWALK)) ? "off" : "on";
+            if (target->GetCommandStatus(CHEAT_WATERWALK))
                 argstr = "off";
             else
                 argstr = "on";
@@ -196,15 +197,15 @@ public:
 
         if (argstr == "off")
         {
-            handler->GetSession()->GetPlayer()->SetCommandStatusOff(CHEAT_WATERWALK);
-            handler->GetSession()->GetPlayer()->SetMovement(MOVE_LAND_WALK);                // OFF
+            target->SetCommandStatusOff(CHEAT_WATERWALK);
+            target->SetWaterWalking(false);
             handler->SendSysMessage("Waterwalking is OFF. You can't walk on water.");
             return true;
         }
         else if (argstr == "on")
         {
-            handler->GetSession()->GetPlayer()->SetCommandStatusOn(CHEAT_WATERWALK);
-            handler->GetSession()->GetPlayer()->SetMovement(MOVE_WATER_WALK);               // ON
+            target->SetCommandStatusOn(CHEAT_WATERWALK);
+            target->SetWaterWalking(true);
             handler->SendSysMessage("Waterwalking is ON. You can walk on water.");
             return true;
         }
@@ -227,7 +228,7 @@ public:
 
         if (!chr)
             chr = handler->GetSession()->GetPlayer();
-        else if (handler->HasLowerSecurity(chr, 0)) // check online security
+        else if (handler->HasLowerSecurity(chr, ObjectGuid::Empty)) // check online security
             return false;
 
         if (argstr == "on")

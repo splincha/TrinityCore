@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -13,8 +13,10 @@ file(GLOB_RECURSE sources_Achievements Achievements/*.cpp Achievements/*.h)
 file(GLOB_RECURSE sources_Addons Addons/*.cpp Addons/*.h)
 file(GLOB_RECURSE sources_AI AI/*.cpp AI/*.h)
 file(GLOB_RECURSE sources_AuctionHouse AuctionHouse/*.cpp AuctionHouse/*.h)
+file(GLOB_RECURSE sources_AuctionHouseBot AuctionHouseBot/*.cpp AuctionHouseBot/*.h)
 file(GLOB_RECURSE sources_Battlefield Battlefield/*.cpp Battlefield/*.h)
 file(GLOB_RECURSE sources_Battlegrounds Battlegrounds/*.cpp Battlegrounds/*.h)
+file(GLOB_RECURSE sources_BattlePets BattlePets/*.cpp BattlePets/*.h)
 file(GLOB_RECURSE sources_Calendar Calendar/*.cpp Calendar/*.h)
 file(GLOB_RECURSE sources_Chat Chat/*.cpp Chat/*.h)
 file(GLOB_RECURSE sources_Combat Combat/*.cpp Combat/*.h)
@@ -23,6 +25,7 @@ file(GLOB_RECURSE sources_DataStores DataStores/*.cpp DataStores/*.h)
 file(GLOB_RECURSE sources_DungeonFinding DungeonFinding/*.cpp DungeonFinding/*.h)
 file(GLOB_RECURSE sources_Entities Entities/*.cpp Entities/*.h)
 file(GLOB_RECURSE sources_Events Events/*.cpp Events/*.h)
+file(GLOB_RECURSE sources_Garrison Garrison/*.cpp Garrison/*.h)
 file(GLOB_RECURSE sources_Globals Globals/*.cpp Globals/*.h)
 file(GLOB_RECURSE sources_Grids Grids/*.cpp Grids/*.h)
 file(GLOB_RECURSE sources_Groups Groups/*.cpp Groups/*.h)
@@ -42,9 +45,9 @@ file(GLOB_RECURSE sources_Scripting Scripting/*.cpp Scripting/*.h)
 file(GLOB_RECURSE sources_Server Server/*.cpp Server/*.h)
 file(GLOB_RECURSE sources_Skills Skills/*.cpp Skills/*.h)
 file(GLOB_RECURSE sources_Spells Spells/*.cpp Spells/*.h)
+file(GLOB_RECURSE sources_Support Support/*.cpp Support/*.h)
 file(GLOB_RECURSE sources_Texts Texts/*.cpp Texts/*.h)
 file(GLOB_RECURSE sources_Tools Tools/*.cpp Tools/*.h)
-file(GLOB_RECURSE sources_Tickets Tickets/*.cpp Tickets/*.h)
 file(GLOB_RECURSE sources_Warden Warden/*.cpp Warden/*.h)
 file(GLOB_RECURSE sources_Weather Weather/*.cpp Weather/*.h)
 file(GLOB_RECURSE sources_World World/*.cpp World/*.h)
@@ -63,8 +66,10 @@ set(game_STAT_SRCS
   ${sources_Addons}
   ${sources_AI}
   ${sources_AuctionHouse}
+  ${sources_AuctionHouseBot}
   ${sources_Battlefield}
   ${sources_Battlegrounds}
+  ${sources_BattlePets}
   ${sources_Calendar}
   ${sources_Chat}
   ${sources_Combat}
@@ -73,6 +78,7 @@ set(game_STAT_SRCS
   ${sources_DungeonFinding}
   ${sources_Entities}
   ${sources_Events}
+  ${sources_Garrison}
   ${sources_Globals}
   ${sources_Grids}
   ${sources_Groups}
@@ -92,52 +98,29 @@ set(game_STAT_SRCS
   ${sources_Server}
   ${sources_Skills}
   ${sources_Spells}
+  ${sources_Support}
   ${sources_Texts}
   ${sources_Tools}
-  ${sources_Tickets}
   ${sources_Warden}
   ${sources_Weather}
   ${sources_World}
 )
 
 include_directories(
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
-  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Recast
-  ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
-  ${CMAKE_SOURCE_DIR}/dep/SFMT
-  ${CMAKE_SOURCE_DIR}/dep/zlib
-  ${CMAKE_SOURCE_DIR}/src/server/collision
-  ${CMAKE_SOURCE_DIR}/src/server/collision/Management
-  ${CMAKE_SOURCE_DIR}/src/server/collision/Models
-  ${CMAKE_SOURCE_DIR}/src/server/collision/Maps
-  ${CMAKE_SOURCE_DIR}/src/server/shared
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Configuration
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Cryptography
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Cryptography/Authentication
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Database
-  ${CMAKE_SOURCE_DIR}/src/server/shared/DataStores
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Debugging
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Dynamic/LinkedReference
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Dynamic
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Logging
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Threading
-  ${CMAKE_SOURCE_DIR}/src/server/shared/Utilities
-  ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/Accounts
   ${CMAKE_CURRENT_SOURCE_DIR}/Achievements
   ${CMAKE_CURRENT_SOURCE_DIR}/Addons
   ${CMAKE_CURRENT_SOURCE_DIR}/AI
   ${CMAKE_CURRENT_SOURCE_DIR}/AI/CoreAI
-  ${CMAKE_CURRENT_SOURCE_DIR}/AI/EventAI
   ${CMAKE_CURRENT_SOURCE_DIR}/AI/ScriptedAI
   ${CMAKE_CURRENT_SOURCE_DIR}/AI/SmartScripts
   ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouse
+  ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouseBot
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlefield
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlefield/Zones
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds/Zones
+  ${CMAKE_CURRENT_SOURCE_DIR}/BattlePets
   ${CMAKE_CURRENT_SOURCE_DIR}/Calendar
   ${CMAKE_CURRENT_SOURCE_DIR}/Chat
   ${CMAKE_CURRENT_SOURCE_DIR}/Chat/Channels
@@ -145,9 +128,9 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Conditions
   ${CMAKE_CURRENT_SOURCE_DIR}/DataStores
   ${CMAKE_CURRENT_SOURCE_DIR}/DungeonFinding
-  ${CMAKE_CURRENT_SOURCE_DIR}/Entities
-  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Creature
+  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/AreaTrigger
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Corpse
+  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Creature
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/DynamicObject
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/GameObject
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Item
@@ -156,15 +139,17 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Object/Updates
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Pet
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Player
+  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Taxi
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Totem
+  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Transport
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Unit
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Vehicle
-  ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Transport
   ${CMAKE_CURRENT_SOURCE_DIR}/Events
+  ${CMAKE_CURRENT_SOURCE_DIR}/Garrison
   ${CMAKE_CURRENT_SOURCE_DIR}/Globals
+  ${CMAKE_CURRENT_SOURCE_DIR}/Grids
   ${CMAKE_CURRENT_SOURCE_DIR}/Grids/Cells
   ${CMAKE_CURRENT_SOURCE_DIR}/Grids/Notifiers
-  ${CMAKE_CURRENT_SOURCE_DIR}/Grids
   ${CMAKE_CURRENT_SOURCE_DIR}/Groups
   ${CMAKE_CURRENT_SOURCE_DIR}/Guilds
   ${CMAKE_CURRENT_SOURCE_DIR}/Handlers
@@ -174,39 +159,66 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Maps
   ${CMAKE_CURRENT_SOURCE_DIR}/Miscellaneous
   ${CMAKE_CURRENT_SOURCE_DIR}/Movement
-  ${CMAKE_CURRENT_SOURCE_DIR}/Movement/Spline
   ${CMAKE_CURRENT_SOURCE_DIR}/Movement/MovementGenerators
+  ${CMAKE_CURRENT_SOURCE_DIR}/Movement/Spline
   ${CMAKE_CURRENT_SOURCE_DIR}/Movement/Waypoints
   ${CMAKE_CURRENT_SOURCE_DIR}/OutdoorPvP
   ${CMAKE_CURRENT_SOURCE_DIR}/Pools
-  ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders
   ${CMAKE_CURRENT_SOURCE_DIR}/Quests
   ${CMAKE_CURRENT_SOURCE_DIR}/Reputation
   ${CMAKE_CURRENT_SOURCE_DIR}/Scripting
-  ${CMAKE_CURRENT_SOURCE_DIR}/Server/Protocol
   ${CMAKE_CURRENT_SOURCE_DIR}/Server
+  ${CMAKE_CURRENT_SOURCE_DIR}/Server/Packets
+  ${CMAKE_CURRENT_SOURCE_DIR}/Server/Protocol
   ${CMAKE_CURRENT_SOURCE_DIR}/Skills
   ${CMAKE_CURRENT_SOURCE_DIR}/Spells
   ${CMAKE_CURRENT_SOURCE_DIR}/Spells/Auras
+  ${CMAKE_CURRENT_SOURCE_DIR}/Support
   ${CMAKE_CURRENT_SOURCE_DIR}/Texts
-  ${CMAKE_CURRENT_SOURCE_DIR}/Tools
   ${CMAKE_CURRENT_SOURCE_DIR}/Tickets
+  ${CMAKE_CURRENT_SOURCE_DIR}/Tools
   ${CMAKE_CURRENT_SOURCE_DIR}/Warden
   ${CMAKE_CURRENT_SOURCE_DIR}/Warden/Modules
   ${CMAKE_CURRENT_SOURCE_DIR}/Weather
   ${CMAKE_CURRENT_SOURCE_DIR}/World
-  ${CMAKE_SOURCE_DIR}/src/server/scripts/PrecompiledHeaders
-  ${ACE_INCLUDE_DIR}
+  ${CMAKE_SOURCE_DIR}/dep/cppformat
+  ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour/Include
+  ${CMAKE_SOURCE_DIR}/dep/zlib
+  ${CMAKE_SOURCE_DIR}/dep/zmqpp
+  ${CMAKE_SOURCE_DIR}/src/common
+  ${CMAKE_SOURCE_DIR}/src/common/Collision
+  ${CMAKE_SOURCE_DIR}/src/common/Collision/Management
+  ${CMAKE_SOURCE_DIR}/src/common/Collision/Maps
+  ${CMAKE_SOURCE_DIR}/src/common/Collision/Models
+  ${CMAKE_SOURCE_DIR}/src/common/Configuration
+  ${CMAKE_SOURCE_DIR}/src/common/Cryptography
+  ${CMAKE_SOURCE_DIR}/src/common/Cryptography/Authentication
+  ${CMAKE_SOURCE_DIR}/src/common/Debugging
+  ${CMAKE_SOURCE_DIR}/src/common/Logging
+  ${CMAKE_SOURCE_DIR}/src/common/Threading
+  ${CMAKE_SOURCE_DIR}/src/common/Utilities
+  ${CMAKE_SOURCE_DIR}/src/server/database
+  ${CMAKE_SOURCE_DIR}/src/server/database/Database
+  ${CMAKE_SOURCE_DIR}/src/server/ipc
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/DataStores
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Dynamic
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Dynamic/LinkedReference
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Networking
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets
   ${MYSQL_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR}
+  ${VALGRIND_INCLUDE_DIR}
+  ${ZMQ_INCLUDE_DIR}
 )
+
+GroupSources(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(game STATIC
-  ${game_STAT_SRCS}
   ${game_STAT_PCH_SRC}
+  ${game_STAT_SRCS}
 )
-
-add_dependencies(game revision.h)
 
 # Generate precompiled header
 if (USE_COREPCH)

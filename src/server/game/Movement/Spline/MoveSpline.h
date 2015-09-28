@@ -22,25 +22,38 @@
 #include "Spline.h"
 #include "MoveSplineInitArgs.h"
 
+namespace WorldPackets
+{
+    namespace Movement
+    {
+        class CommonMovement;
+        class MonsterMove;
+    }
+}
+
 namespace Movement
 {
     struct Location : public Vector3
     {
-        Location() : orientation(0) {}
-        Location(float x, float y, float z, float o) : Vector3(x, y, z), orientation(o) {}
-        Location(const Vector3& v) : Vector3(v), orientation(0) {}
-        Location(const Vector3& v, float o) : Vector3(v), orientation(o) {}
+        Location() : orientation(0) { }
+        Location(float x, float y, float z, float o) : Vector3(x, y, z), orientation(o) { }
+        Location(const Vector3& v) : Vector3(v), orientation(0) { }
+        Location(const Vector3& v, float o) : Vector3(v), orientation(o) { }
 
         float orientation;
     };
 
     // MoveSpline represents smooth catmullrom or linear curve and point that moves belong it
     // curve can be cyclic - in this case movement will be cyclic
-    // point can have vertical acceleration motion componemt(used in fall, parabolic movement)
+    // point can have vertical acceleration motion component (used in fall, parabolic movement)
     class MoveSpline
     {
+        friend class WorldPackets::Movement::CommonMovement;
+        friend class WorldPackets::Movement::MonsterMove;
+
     public:
         typedef Spline<int32> MySpline;
+
         enum UpdateResult
         {
             Result_None         = 0x01,
@@ -48,7 +61,6 @@ namespace Movement
             Result_NextCycle    = 0x04,
             Result_NextSegment  = 0x08
         };
-        friend class PacketBuilder;
 
     protected:
         MySpline        spline;
@@ -117,8 +129,8 @@ namespace Movement
         bool Finalized() const { return splineflags.done; }
         bool isCyclic() const { return splineflags.cyclic; }
         bool isFalling() const { return splineflags.falling; }
-        Vector3 FinalDestination() const { return Initialized() ? spline.getPoint(spline.last()) : Vector3(); }
-        Vector3 CurrentDestination() const { return Initialized() ? spline.getPoint(point_Idx + 1) : Vector3(); }
+        Vector3 const& FinalDestination() const { return Initialized() ? spline.getPoint(spline.last()) : Vector3::zero(); }
+        Vector3 const& CurrentDestination() const { return Initialized() ? spline.getPoint(point_Idx + 1) : Vector3::zero(); }
         int32 currentPathIdx() const;
 
         bool onTransport;

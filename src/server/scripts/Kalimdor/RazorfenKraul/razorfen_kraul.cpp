@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2013 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -47,28 +47,21 @@ class npc_willix : public CreatureScript
 public:
     npc_willix() : CreatureScript("npc_willix") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) OVERRIDE
-    {
-        if (quest->GetQuestId() == QUEST_WILLIX_THE_IMPORTER)
-        {
-            CAST_AI(npc_escortAI, (creature->AI()))->Start(true, false, player->GetGUID());
-            creature->AI()->Talk(SAY_READY, player->GetGUID());
-            creature->setFaction(113);
-        }
-
-        return true;
-    }
-
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
-    {
-        return new npc_willixAI(creature);
-    }
-
     struct npc_willixAI : public npc_escortAI
     {
-        npc_willixAI(Creature* creature) : npc_escortAI(creature) {}
+        npc_willixAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void WaypointReached(uint32 waypointId) OVERRIDE
+        void sQuestAccept(Player* player, Quest const* quest) override
+        {
+            if (quest->GetQuestId() == QUEST_WILLIX_THE_IMPORTER)
+            {
+                Start(true, false, player->GetGUID());
+                Talk(SAY_READY, player);
+                me->setFaction(113);
+            }
+        }
+
+        void WaypointReached(uint32 waypointId) override
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -78,65 +71,69 @@ public:
             {
                 case 3:
                     me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                    Talk(SAY_POINT, player->GetGUID());
+                    Talk(SAY_POINT, player);
                     break;
                 case 4:
                     me->SummonCreature(ENTRY_BOAR, 2137.66f, 1843.98f, 48.08f, 1.54f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
                     break;
                 case 8:
-                    Talk(SAY_BLUELEAF, player->GetGUID());
+                    Talk(SAY_BLUELEAF, player);
                     break;
                 case 9:
-                    Talk(SAY_DANGER, player->GetGUID());
+                    Talk(SAY_DANGER, player);
                     break;
                 case 13:
-                    Talk(SAY_BAD, player->GetGUID());
+                    Talk(SAY_BAD, player);
                     break;
                 case 14:
                     me->SummonCreature(ENTRY_BOAR, 2078.91f, 1704.54f, 56.77f, 1.54f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
                     break;
                 case 25:
-                    Talk(SAY_THINK, player->GetGUID());
+                    Talk(SAY_THINK, player);
                     break;
                 case 31:
-                    Talk(SAY_SOON, player->GetGUID());
+                    Talk(SAY_SOON, player);
                     break;
                 case 42:
-                    Talk(SAY_FINALY, player->GetGUID());
+                    Talk(SAY_FINALY, player);
                     break;
                 case 43:
                     me->SummonCreature(ENTRY_BOAR, 1956.43f, 1596.97f, 81.75f, 1.54f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
                     break;
                 case 45:
-                    Talk(SAY_WIN, player->GetGUID());
+                    Talk(SAY_WIN, player);
                     me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
                     player->GroupEventHappens(QUEST_WILLIX_THE_IMPORTER, me);
                     break;
                 case 46:
-                    Talk(SAY_END, player->GetGUID());
+                    Talk(SAY_END, player);
                     break;
             }
         }
 
-        void Reset() OVERRIDE {}
+        void Reset() override { }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO1);
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             summoned->AI()->AttackStart(me);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             if (Player* player = GetPlayerForEscort())
                 player->FailQuest(QUEST_WILLIX_THE_IMPORTER);
         }
     };
 
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_willixAI(creature);
+    }
 };
 
 enum SnufflenoseGopher
@@ -147,38 +144,30 @@ enum SnufflenoseGopher
     POINT_TUBBER                 = 0
 };
 
-struct DistanceOrder : public std::binary_function<GameObject, GameObject, bool>
-{
-    DistanceOrder(Creature* me) : me(me) {}
-
-    bool operator() (GameObject* first, GameObject* second)
-    {
-        return me->GetDistanceOrder(first, second);
-    }
-
-    Creature* me;
-};
-
 struct npc_snufflenose_gopher : public CreatureScript
 {
 public:
     npc_snufflenose_gopher() : CreatureScript("npc_snufflenose_gopher") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_snufflenose_gopherAI(creature);
     }
 
     struct npc_snufflenose_gopherAI : public PetAI
     {
-        npc_snufflenose_gopherAI(Creature* creature) : PetAI(creature) { }
-
-        void Reset() OVERRIDE
+        npc_snufflenose_gopherAI(Creature* creature) : PetAI(creature)
         {
             IsMovementActive = false;
         }
 
-        void MovementInform(uint32 type, uint32 id) OVERRIDE
+        void Reset() override
+        {
+            IsMovementActive = false;
+            TargetTubberGUID.Clear();
+        }
+
+        void MovementInform(uint32 type, uint32 id) override
         {
             if (type == POINT_MOTION_TYPE && id == POINT_TUBBER)
             {
@@ -203,18 +192,14 @@ public:
             if (tubbersInRange.empty())
                 return;
 
-            tubbersInRange.sort(DistanceOrder(me));
-            GameObject* nearestTubber = NULL;
-
-            for (std::list<GameObject*>::const_iterator itr = tubbersInRange.begin(); itr != tubbersInRange.end(); ++itr)
+            tubbersInRange.remove_if([](GameObject* go)
             {
-                if (!(*itr)->isSpawned() && (*itr)->HasFlag(GAMEOBJECT_FLAGS, GO_FLAG_INTERACT_COND))
-                {
-                    nearestTubber = *itr;
-                    break;
-                }
-            }
+                return go->isSpawned() || !go->HasFlag(GAMEOBJECT_FLAGS, GO_FLAG_INTERACT_COND);
+            });
 
+            tubbersInRange.sort(Trinity::ObjectDistanceOrderPred(me));
+
+            GameObject* nearestTubber = tubbersInRange.front();
             if (!nearestTubber)
                 return;
 
@@ -227,13 +212,13 @@ public:
             IsMovementActive = true;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!IsMovementActive)
                 PetAI::UpdateAI(diff);
         }
 
-        void DoAction(int32 action) OVERRIDE
+        void DoAction(int32 action) override
         {
             if (action == ACTION_FIND_NEW_TUBBER)
                 DoFindNewTubber();
@@ -241,7 +226,7 @@ public:
 
 
         bool IsMovementActive;
-        uint64 TargetTubberGUID;
+        ObjectGuid TargetTubberGUID;
     };
 };
 
@@ -254,25 +239,20 @@ class spell_snufflenose_command : public SpellScriptLoader
         {
             PrepareSpellScript(spell_snufflenose_commandSpellScript);
 
-            bool Load() OVERRIDE
+            void HandleEffect(SpellEffIndex /*effIndex*/)
             {
-                return GetCaster()->GetTypeId() == TYPEID_PLAYER;
-            }
-
-            void HandleAfterCast()
-            {
-                if (Unit* target = GetCaster()->ToPlayer()->GetSelectedUnit())
+                if (Creature* target = GetHitCreature())
                     if (target->GetEntry() == NPC_SNUFFLENOSE_GOPHER)
-                        target->ToCreature()->AI()->DoAction(ACTION_FIND_NEW_TUBBER);
+                        target->AI()->DoAction(ACTION_FIND_NEW_TUBBER);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
-                AfterCast += SpellCastFn(spell_snufflenose_commandSpellScript::HandleAfterCast);
+                OnEffectHitTarget += SpellEffectFn(spell_snufflenose_commandSpellScript::HandleEffect, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_snufflenose_commandSpellScript();
         }

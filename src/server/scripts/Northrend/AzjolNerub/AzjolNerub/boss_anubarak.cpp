@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -87,7 +87,29 @@ public:
     {
         boss_anub_arakAI(Creature* creature) : ScriptedAI(creature), Summons(me)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+            GuardianSummoned = false;
+            VenomancerSummoned = false;
+            DatterSummoned = false;
+            UndergroundTimer = 0;
+            VenomancerTimer = 0;
+            DatterTimer = 0;
+            DelayTimer = 0;
+        }
+
+        void Initialize()
+        {
+            CarrionBeetlesTimer = 8 * IN_MILLISECONDS;
+            LeechingSwarmTimer = 20 * IN_MILLISECONDS;
+            ImpaleTimer = 9 * IN_MILLISECONDS;
+            PoundTimer = 15 * IN_MILLISECONDS;
+
+            Phase = PHASE_MELEE;
+            UndergroundPhase = 0;
+            Channeling = false;
+            ImpalePhase = IMPALE_PHASE_TARGET;
+            ImpaleTarget.Clear();
         }
 
         InstanceScript* instance;
@@ -101,7 +123,6 @@ public:
         uint32 CarrionBeetlesTimer;
         uint32 LeechingSwarmTimer;
         uint32 PoundTimer;
-        uint32 SubmergeTimer;
         uint32 UndergroundTimer;
         uint32 VenomancerTimer;
         uint32 DatterTimer;
@@ -109,38 +130,26 @@ public:
 
         uint32 ImpaleTimer;
         uint32 ImpalePhase;
-        uint64 ImpaleTarget;
+        ObjectGuid ImpaleTarget;
 
         SummonList Summons;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            CarrionBeetlesTimer = 8*IN_MILLISECONDS;
-            LeechingSwarmTimer = 20*IN_MILLISECONDS;
-            ImpaleTimer = 9*IN_MILLISECONDS;
-            PoundTimer = 15*IN_MILLISECONDS;
-
-            Phase = PHASE_MELEE;
-            UndergroundPhase = 0;
-            Channeling = false;
-            ImpalePhase = IMPALE_PHASE_TARGET;
+            Initialize();
 
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE);
             me->RemoveAura(SPELL_SUBMERGE);
 
             Summons.DespawnAll();
 
-            if (instance)
-            {
-                instance->SetBossState(DATA_ANUBARAK, NOT_STARTED);
-                instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
-            }
+            instance->SetBossState(DATA_ANUBARAK, NOT_STARTED);
+            instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
         }
 
         Creature* DoSummonImpaleTarget(Unit* target)
         {
-            Position targetPos;
-            target->GetPosition(&targetPos);
+            Position targetPos = target->GetPosition();
 
             if (TempSummon* impaleTarget = me->SummonCreature(CREATURE_IMPALE_TARGET, targetPos, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 6*IN_MILLISECONDS))
             {
@@ -154,21 +163,19 @@ public:
             return NULL;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
             DelayTimer = 0;
-            if (instance)
-                instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
+            instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
         }
 
         void DelayEventStart()
         {
-            if (instance)
-                instance->SetBossState(DATA_ANUBARAK, IN_PROGRESS);
+            instance->SetBossState(DATA_ANUBARAK, IN_PROGRESS);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -194,7 +201,7 @@ public:
                         }
                         break;
                     case IMPALE_PHASE_ATTACK:
-                        if (Creature* impaleTarget = Unit::GetCreature(*me, ImpaleTarget))
+                        if (Creature* impaleTarget = ObjectAccessor::GetCreature(*me, ImpaleTarget))
                         {
                             impaleTarget->CastSpell(impaleTarget, SPELL_IMPALE_SPIKE, false);
                             impaleTarget->RemoveAurasDueToSpell(SPELL_IMPALE_SHAKEGROUND);
@@ -203,7 +210,7 @@ public:
                         ImpaleTimer = 1*IN_MILLISECONDS;
                         break;
                     case IMPALE_PHASE_DMG:
-                        if (Creature* impaleTarget = Unit::GetCreature(*me, ImpaleTarget))
+                        if (Creature* impaleTarget = ObjectAccessor::GetCreature(*me, ImpaleTarget))
                             me->CastSpell(impaleTarget, SPELL_IMPALE_DMG, true);
                         ImpalePhase = IMPALE_PHASE_TARGET;
                         ImpaleTimer = 9*IN_MILLISECONDS;
@@ -331,15 +338,14 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
             Summons.DespawnAll();
-            if (instance)
-                instance->SetBossState(DATA_ANUBARAK, DONE);
+            instance->SetBossState(DATA_ANUBARAK, DONE);
         }
 
-        void KilledUnit(Unit* victim) OVERRIDE
+        void KilledUnit(Unit* victim) override
         {
             if (victim->GetTypeId() != TYPEID_PLAYER)
                 return;
@@ -347,15 +353,15 @@ public:
             Talk(SAY_SLAY);
         }
 
-        void JustSummoned(Creature* summon) OVERRIDE
+        void JustSummoned(Creature* summon) override
         {
             Summons.Summon(summon);
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_anub_arakAI(creature);
+        return GetInstanceAI<boss_anub_arakAI>(creature);
     }
 };
 

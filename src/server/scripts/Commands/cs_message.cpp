@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,7 +34,7 @@ class message_commandscript : public CommandScript
 public:
     message_commandscript() : CommandScript("message_commandscript") { }
 
-    ChatCommand* GetCommands() const
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand channelSetCommandTable[] =
         {
@@ -74,7 +74,7 @@ public:
         Player* player = handler->GetSession()->GetPlayer();
         Channel* channcel = NULL;
 
-        if (ChannelMgr* cMgr = ChannelMgr::forTeam(player->GetTeam()))
+        if (ChannelMgr* cMgr = ChannelMgr::ForTeam(player->GetTeam()))
             channcel = cMgr->GetChannel(channelStr, player);
 
         if (strcmp(argStr, "on") == 0)
@@ -134,9 +134,9 @@ public:
         if (!*args)
             return false;
 
-        char buff[2048];
-        sprintf(buff, handler->GetTrinityString(LANG_SYSTEMMESSAGE), args);
-        sWorld->SendServerMessage(SERVER_MSG_STRING, buff);
+        std::string str = handler->PGetParseString(LANG_SYSTEMMESSAGE, args);
+
+        sWorld->SendServerMessage(SERVER_MSG_STRING, str);
         return true;
     }
     // announce to logged in GMs
@@ -157,9 +157,7 @@ public:
         std::string str = handler->GetTrinityString(LANG_GLOBAL_NOTIFY);
         str += args;
 
-        WorldPacket data(SMSG_NOTIFICATION, (str.size()+1));
-        data << str;
-        sWorld->SendGlobalMessage(&data);
+        sWorld->SendGlobalMessage(WorldPackets::Chat::PrintNotification(str).Write());
 
         return true;
     }
@@ -172,9 +170,7 @@ public:
         std::string str = handler->GetTrinityString(LANG_GM_NOTIFY);
         str += args;
 
-        WorldPacket data(SMSG_NOTIFICATION, (str.size()+1));
-        data << str;
-        sWorld->SendGlobalGMMessage(&data);
+        sWorld->SendGlobalGMMessage(WorldPackets::Chat::PrintNotification(str).Write());
 
         return true;
     }
@@ -211,7 +207,7 @@ public:
             std::string name = strtok(NULL, " ");
             if (normalizePlayerName(name))
             {
-                if (Player* player = sObjectAccessor->FindPlayerByName(name))
+                if (Player* player = ObjectAccessor::FindPlayerByName(name))
                 {
                     handler->GetSession()->GetPlayer()->RemoveFromWhisperWhiteList(player->GetGUID());
                     handler->PSendSysMessage(LANG_COMMAND_WHISPEROFFPLAYER, name.c_str());

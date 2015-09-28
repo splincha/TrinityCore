@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,37 +25,41 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "ObjectMgr.h"
 #include "MapManager.h"
-#include "TicketMgr.h"
+#include "SupportMgr.h"
 #include "Chat.h"
 #include "Language.h"
 #include "Player.h"
+#include "Transport.h"
 
 class go_commandscript : public CommandScript
 {
 public:
     go_commandscript() : CommandScript("go_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand goCommandTable[] =
         {
-            { "creature",  rbac::RBAC_PERM_COMMAND_GO_CREATURE,  false, &HandleGoCreatureCommand,  "", NULL },
-            { "graveyard", rbac::RBAC_PERM_COMMAND_GO_GRAVEYARD, false, &HandleGoGraveyardCommand, "", NULL },
-            { "grid",      rbac::RBAC_PERM_COMMAND_GO_GRID,      false, &HandleGoGridCommand,      "", NULL },
-            { "object",    rbac::RBAC_PERM_COMMAND_GO_OBJECT,    false, &HandleGoObjectCommand,    "", NULL },
-            { "taxinode",  rbac::RBAC_PERM_COMMAND_GO_TAXINODE,  false, &HandleGoTaxinodeCommand,  "", NULL },
-            { "trigger",   rbac::RBAC_PERM_COMMAND_GO_TRIGGER,   false, &HandleGoTriggerCommand,   "", NULL },
-            { "zonexy",    rbac::RBAC_PERM_COMMAND_GO_ZONEXY,    false, &HandleGoZoneXYCommand,    "", NULL },
-            { "xyz",       rbac::RBAC_PERM_COMMAND_GO_XYZ,       false, &HandleGoXYZCommand,       "", NULL },
-            { "ticket",    rbac::RBAC_PERM_COMMAND_GO_TICKET,    false, &HandleGoTicketCommand,    "", NULL },
-            { "",          rbac::RBAC_PERM_COMMAND_GO,           false, &HandleGoXYZCommand,       "", NULL },
-            { NULL,        0,                              false, NULL,                      "", NULL }
+            { "creature",           rbac::RBAC_PERM_COMMAND_GO_CREATURE,            false, &HandleGoCreatureCommand,                    "", NULL },
+            { "graveyard",          rbac::RBAC_PERM_COMMAND_GO_GRAVEYARD,           false, &HandleGoGraveyardCommand,                   "", NULL },
+            { "grid",               rbac::RBAC_PERM_COMMAND_GO_GRID,                false, &HandleGoGridCommand,                        "", NULL },
+            { "object",             rbac::RBAC_PERM_COMMAND_GO_OBJECT,              false, &HandleGoObjectCommand,                      "", NULL },
+            { "quest",              rbac::RBAC_PERM_COMMAND_GO_QUEST,               false, &HandleGoQuestCommand,                       "", NULL },
+            { "taxinode",           rbac::RBAC_PERM_COMMAND_GO_TAXINODE,            false, &HandleGoTaxinodeCommand,                    "", NULL },
+            { "trigger",            rbac::RBAC_PERM_COMMAND_GO_TRIGGER,             false, &HandleGoTriggerCommand,                     "", NULL },
+            { "zonexy",             rbac::RBAC_PERM_COMMAND_GO_ZONEXY,              false, &HandleGoZoneXYCommand,                      "", NULL },
+            { "xyz",                rbac::RBAC_PERM_COMMAND_GO_XYZ,                 false, &HandleGoXYZCommand,                         "", NULL },
+            { "bugticket",          rbac::RBAC_PERM_COMMAND_GO_BUG_TICKET,          false, &HandleGoTicketCommand<BugTicket>,           "", NULL },
+            { "complaintticket",    rbac::RBAC_PERM_COMMAND_GO_COMPLAINT_TICKET,    false, &HandleGoTicketCommand<ComplaintTicket>,     "", NULL },
+            { "suggestionticket",   rbac::RBAC_PERM_COMMAND_GO_SUGGESTION_TICKET,   false, &HandleGoTicketCommand<SuggestionTicket>,    "", NULL },
+            { "",                   rbac::RBAC_PERM_COMMAND_GO,                     false, &HandleGoXYZCommand,                         "", NULL },
+            { NULL,                 0,                                              false, NULL,                                        "", NULL }
         };
 
         static ChatCommand commandTable[] =
         {
             { "go", rbac::RBAC_PERM_COMMAND_GO, false, NULL, "", goCommandTable },
-            { NULL, 0,                    false, NULL, "", NULL }
+            { NULL, 0,                          false, NULL, "", NULL }
         };
         return commandTable;
     }
@@ -112,13 +116,13 @@ public:
             {
                 std::string name = param1;
                 WorldDatabase.EscapeString(name);
-                whereClause << ", creature_template WHERE creature.id = creature_template.entry AND creature_template.name "_LIKE_" '" << name << '\'';
+                whereClause << ", creature_template WHERE creature.id = creature_template.entry AND creature_template.name " _LIKE_" '" << name << '\'';
             }
             else
                 whereClause <<  "WHERE guid = '" << guid << '\'';
         }
 
-        QueryResult result = WorldDatabase.PQuery("SELECT position_x, position_y, position_z, orientation, map, guid, id FROM creature %s", whereClause.str().c_str());
+        QueryResult result = WorldDatabase.PQuery("SELECT position_x, position_y, position_z, orientation, map FROM creature %s", whereClause.str().c_str());
         if (!result)
         {
             handler->SendSysMessage(LANG_COMMAND_GOCREATNOTFOUND);
@@ -132,21 +136,10 @@ public:
         float x = fields[0].GetFloat();
         float y = fields[1].GetFloat();
         float z = fields[2].GetFloat();
-        float ort = fields[3].GetFloat();
-        int mapId = fields[4].GetUInt16();
-        uint32 guid = fields[5].GetUInt32();
-        uint32 id = fields[6].GetUInt32();
+        float o = fields[3].GetFloat();
+        uint32 mapId = fields[4].GetUInt16();
 
-        // if creature is in same map with caster go at its current location
-        if (Creature* creature = sObjectAccessor->GetCreature(*player, MAKE_NEW_GUID(guid, id, HIGHGUID_UNIT)))
-        {
-            x = creature->GetPositionX();
-            y = creature->GetPositionY();
-            z = creature->GetPositionZ();
-            ort = creature->GetOrientation();
-        }
-
-        if (!MapManager::IsValidMapCoord(mapId, x, y, z, ort))
+        if (!MapManager::IsValidMapCoord(mapId, x, y, z, o) || sObjectMgr->IsTransportMap(mapId))
         {
             handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, x, y, mapId);
             handler->SetSentErrorMessage(true);
@@ -163,7 +156,8 @@ public:
         else
             player->SaveRecallPosition();
 
-        player->TeleportTo(mapId, x, y, z, ort);
+        player->TeleportTo(mapId, x, y, z, o);
+
         return true;
     }
 
@@ -191,9 +185,9 @@ public:
             return false;
         }
 
-        if (!MapManager::IsValidMapCoord(gy->map_id, gy->x, gy->y, gy->z))
+        if (!MapManager::IsValidMapCoord(gy->MapID, gy->Loc.X, gy->Loc.Y, gy->Loc.Z))
         {
-            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, gy->x, gy->y, gy->map_id);
+            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, gy->Loc.X, gy->Loc.Y, gy->MapID);
             handler->SetSentErrorMessage(true);
             return false;
         }
@@ -208,7 +202,7 @@ public:
         else
             player->SaveRecallPosition();
 
-        player->TeleportTo(gy->map_id, gy->x, gy->y, gy->z, player->GetOrientation());
+        player->TeleportTo(gy->MapID, gy->Loc.X, gy->Loc.Y, gy->Loc.Z, (gy->Facing * M_PI) / 180); // Orientation is initially in degrees
         return true;
     }
 
@@ -270,12 +264,12 @@ public:
         if (!id)
             return false;
 
-        int32 guid = atoi(id);
+        ObjectGuid::LowType guid = strtoull(id, nullptr, 10);
         if (!guid)
             return false;
 
-        float x, y, z, ort;
-        int mapId;
+        float x, y, z, o;
+        uint32 mapId;
 
         // by DB guid
         if (GameObjectData const* goData = sObjectMgr->GetGOData(guid))
@@ -283,7 +277,7 @@ public:
             x = goData->posX;
             y = goData->posY;
             z = goData->posZ;
-            ort = goData->orientation;
+            o = goData->orientation;
             mapId = goData->mapid;
         }
         else
@@ -293,7 +287,7 @@ public:
             return false;
         }
 
-        if (!MapManager::IsValidMapCoord(mapId, x, y, z, ort))
+        if (!MapManager::IsValidMapCoord(mapId, x, y, z, o) || sObjectMgr->IsTransportMap(mapId))
         {
             handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, x, y, mapId);
             handler->SetSentErrorMessage(true);
@@ -310,7 +304,72 @@ public:
         else
             player->SaveRecallPosition();
 
-        player->TeleportTo(mapId, x, y, z, ort);
+        player->TeleportTo(mapId, x, y, z, o);
+        return true;
+    }
+
+    static bool HandleGoQuestCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        Player* player = handler->GetSession()->GetPlayer();
+
+        char* id = handler->extractKeyFromLink((char*)args, "Hquest");
+        if (!id)
+            return false;
+
+        uint32 questID = atoi(id);
+        if (!questID)
+            return false;
+
+        if (!sObjectMgr->GetQuestTemplate(questID))
+        {
+            handler->PSendSysMessage(LANG_COMMAND_QUEST_NOTFOUND, questID);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        float x, y, z;
+        uint32 mapId;
+
+        if (QuestPOIVector const* poiData = sObjectMgr->GetQuestPOIVector(questID))
+        {
+            auto data = poiData->front();
+
+            mapId = data.MapID;
+
+            x = data.points.front().X;
+            y = data.points.front().Y;
+        }
+        else
+        {
+            handler->PSendSysMessage(LANG_COMMAND_QUEST_NOTFOUND, questID);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        if (!MapManager::IsValidMapCoord(mapId, x, y) || sObjectMgr->IsTransportMap(mapId))
+        {
+            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, x, y, mapId);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        // stop flight if need
+        if (player->IsInFlight())
+        {
+            player->GetMotionMaster()->MovementExpired();
+            player->CleanupAfterTaxiFlight();
+        }
+        // save only in non-flight case
+        else
+            player->SaveRecallPosition();
+
+        Map const* map = sMapMgr->CreateBaseMap(mapId);
+        z = std::max(map->GetHeight(x, y, MAX_HEIGHT), map->GetWaterLevel(x, y));
+
+        player->TeleportTo(mapId, x, y, z, 0.0f);
         return true;
     }
 
@@ -337,10 +396,10 @@ public:
             return false;
         }
 
-        if ((node->x == 0.0f && node->y == 0.0f && node->z == 0.0f) ||
-            !MapManager::IsValidMapCoord(node->map_id, node->x, node->y, node->z))
+        if ((node->Pos.X == 0.0f && node->Pos.Y == 0.0f && node->Pos.Z == 0.0f) ||
+            !MapManager::IsValidMapCoord(node->MapID, node->Pos.X, node->Pos.Y, node->Pos.Z))
         {
-            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, node->x, node->y, node->map_id);
+            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, node->Pos.X, node->Pos.Y, node->MapID);
             handler->SetSentErrorMessage(true);
             return false;
         }
@@ -355,7 +414,7 @@ public:
         else
             player->SaveRecallPosition();
 
-        player->TeleportTo(node->map_id, node->x, node->y, node->z, player->GetOrientation());
+        player->TeleportTo(node->MapID, node->Pos.X, node->Pos.Y, node->Pos.Z, player->GetOrientation());
         return true;
     }
 
@@ -383,9 +442,9 @@ public:
             return false;
         }
 
-        if (!MapManager::IsValidMapCoord(at->mapid, at->x, at->y, at->z))
+        if (!MapManager::IsValidMapCoord(at->MapID, at->Pos.X, at->Pos.Y, at->Pos.Z))
         {
-            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, at->x, at->y, at->mapid);
+            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, at->Pos.X, at->Pos.Y, at->MapID);
             handler->SetSentErrorMessage(true);
             return false;
         }
@@ -400,7 +459,7 @@ public:
         else
             player->SaveRecallPosition();
 
-        player->TeleportTo(at->mapid, at->x, at->y, at->z, player->GetOrientation());
+        player->TeleportTo(at->MapID, at->Pos.X, at->Pos.Y, at->Pos.Z, player->GetOrientation());
         return true;
     }
 
@@ -440,22 +499,23 @@ public:
         }
 
         // update to parent zone if exist (client map show only zones without parents)
-        AreaTableEntry const* zoneEntry = areaEntry->zone ? GetAreaEntryByAreaID(areaEntry->zone) : areaEntry;
+        AreaTableEntry const* zoneEntry = areaEntry->ParentAreaID ? GetAreaEntryByAreaID(areaEntry->ParentAreaID) : areaEntry;
+        ASSERT(zoneEntry);
 
-        Map const* map = sMapMgr->CreateBaseMap(zoneEntry->mapid);
+        Map const* map = sMapMgr->CreateBaseMap(zoneEntry->MapID);
 
         if (map->Instanceable())
         {
-            handler->PSendSysMessage(LANG_INVALID_ZONE_MAP, areaEntry->ID, areaEntry->area_name[handler->GetSessionDbcLocale()], map->GetId(), map->GetMapName());
+            handler->PSendSysMessage(LANG_INVALID_ZONE_MAP, areaEntry->ID, areaEntry->AreaName_lang, map->GetId(), map->GetMapName());
             handler->SetSentErrorMessage(true);
             return false;
         }
 
         Zone2MapCoordinates(x, y, zoneEntry->ID);
 
-        if (!MapManager::IsValidMapCoord(zoneEntry->mapid, x, y))
+        if (!MapManager::IsValidMapCoord(zoneEntry->MapID, x, y))
         {
-            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, x, y, zoneEntry->mapid);
+            handler->PSendSysMessage(LANG_INVALID_TARGET_COORD, x, y, zoneEntry->MapID);
             handler->SetSentErrorMessage(true);
             return false;
         }
@@ -472,7 +532,7 @@ public:
 
         float z = std::max(map->GetHeight(x, y, MAX_HEIGHT), map->GetWaterLevel(x, y));
 
-        player->TeleportTo(zoneEntry->mapid, x, y, z, player->GetOrientation());
+        player->TeleportTo(zoneEntry->MapID, x, y, z, player->GetOrientation());
         return true;
     }
 
@@ -535,6 +595,7 @@ public:
         return true;
     }
 
+    template<typename T>
     static bool HandleGoTicketCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
@@ -548,7 +609,7 @@ public:
         if (!ticketId)
             return false;
 
-        GmTicket* ticket = sTicketMgr->GetTicket(ticketId);
+        T* ticket = sSupportMgr->GetTicket<T>(ticketId);
         if (!ticket)
         {
             handler->SendSysMessage(LANG_COMMAND_TICKETNOTEXIST);

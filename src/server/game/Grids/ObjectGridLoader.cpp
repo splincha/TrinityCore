@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,10 +20,10 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Creature.h"
-#include "Vehicle.h"
 #include "GameObject.h"
 #include "DynamicObject.h"
 #include "Corpse.h"
+#include "AreaTrigger.h"
 #include "World.h"
 #include "CellImpl.h"
 #include "CreatureAI.h"
@@ -43,14 +43,28 @@ void ObjectGridEvacuator::Visit(CreatureMapType &m)
     }
 }
 
+void ObjectGridEvacuator::Visit(GameObjectMapType &m)
+{
+    // gameobject in unloading grid can have respawn point in another grid
+    // if it will be unloaded then it will not respawn in original grid until unload/load original grid
+    // move to respawn point to prevent this case. For player view in respawn grid this will be normal respawn.
+    for (GameObjectMapType::iterator iter = m.begin(); iter != m.end();)
+    {
+        GameObject* go = iter->GetSource();
+        ++iter;
+
+        go->GetMap()->GameObjectRespawnRelocation(go, true);
+    }
+}
+
 // for loading world object at grid loading (Corpses)
 /// @todo to implement npc on transport, also need to load npcs at grid loading
 class ObjectWorldLoader
 {
     public:
         explicit ObjectWorldLoader(ObjectGridLoader& gloader)
-            : i_cell(gloader.i_cell), i_map(gloader.i_map), i_corpses (0)
-            {}
+            : i_cell(gloader.i_cell), i_map(gloader.i_map), i_grid(gloader.i_grid), i_corpses(gloader.i_corpses)
+            { }
 
         void Visit(CorpseMapType &m);
 
@@ -59,23 +73,36 @@ class ObjectWorldLoader
     private:
         Cell i_cell;
         Map* i_map;
+        NGridType& i_grid;
     public:
-        uint32 i_corpses;
+        uint32& i_corpses;
 };
 
-template<class T> void ObjectGridLoader::SetObjectCell(T* /*obj*/, CellCoord const& /*cellCoord*/)
-{
-}
+template<class T> void ObjectGridLoader::SetObjectCell(T* /*obj*/, CellCoord const& /*cellCoord*/) { }
 
 template<> void ObjectGridLoader::SetObjectCell(Creature* obj, CellCoord const& cellCoord)
 {
     Cell cell(cellCoord);
+    obj->SetCurrentCell(cell);
+}
 
+template<> void ObjectGridLoader::SetObjectCell(GameObject* obj, CellCoord const& cellCoord)
+{
+    Cell cell(cellCoord);
     obj->SetCurrentCell(cell);
 }
 
 template <class T>
-void AddObjectHelper(CellCoord &cell, GridRefManager<T> &m, uint32 &count, Map* map, T *obj)
+void AddObjectHelper(CellCoord &cell, GridRefManager<T> &m, uint32 &count, Map* /*map*/, T *obj)
+{
+    obj->AddToGrid(m);
+    ObjectGridLoader::SetObjectCell(obj, cell);
+    obj->AddToWorld();
+    ++count;
+}
+
+template <>
+void AddObjectHelper(CellCoord &cell, CreatureMapType &m, uint32 &count, Map* map, Creature *obj)
 {
     obj->AddToGrid(m);
     ObjectGridLoader::SetObjectCell(obj, cell);
@@ -92,43 +119,11 @@ void LoadHelper(CellGuidSet const& guid_set, CellCoord &cell, GridRefManager<T> 
     for (CellGuidSet::const_iterator i_guid = guid_set.begin(); i_guid != guid_set.end(); ++i_guid)
     {
         T* obj = new T;
-        uint32 guid = *i_guid;
-        //TC_LOG_INFO(LOG_FILTER_GENERAL, "DEBUG: LoadHelper from table: %s for (guid: %u) Loading", table, guid);
+        ObjectGuid::LowType guid = *i_guid;
+        //TC_LOG_INFO("misc", "DEBUG: LoadHelper from table: %s for (guid: %u) Loading", table, guid);
         if (!obj->LoadFromDB(guid, map))
         {
             delete obj;
-            continue;
-        }
-
-        AddObjectHelper(cell, m, count, map, obj);
-    }
-}
-
-void LoadHelper(CellCorpseSet const& cell_corpses, CellCoord &cell, CorpseMapType &m, uint32 &count, Map* map)
-{
-    if (cell_corpses.empty())
-        return;
-
-    for (CellCorpseSet::const_iterator itr = cell_corpses.begin(); itr != cell_corpses.end(); ++itr)
-    {
-        if (itr->second != map->GetInstanceId())
-            continue;
-
-        uint32 player_guid = itr->first;
-
-        Corpse* obj = sObjectAccessor->GetCorpseForPlayerGUID(player_guid);
-        if (!obj)
-            continue;
-
-        /// @todo this is a hack
-        // corpse's map should be reset when the map is unloaded
-        // but it may still exist when the grid is unloaded but map is not
-        // in that case map == currMap
-        obj->SetMap(map);
-
-        if (obj->IsInGrid())
-        {
-            obj->AddToWorld();
             continue;
         }
 
@@ -153,19 +148,25 @@ void ObjectGridLoader::Visit(CreatureMapType &m)
 void ObjectWorldLoader::Visit(CorpseMapType &m)
 {
     CellCoord cellCoord = i_cell.GetCellCoord();
-    // corpses are always added to spawn mode 0 and they are spawned by their instance id
-    CellObjectGuids const& cell_guids = sObjectMgr->GetCellObjectGuids(i_map->GetId(), 0, cellCoord.GetId());
-    LoadHelper(cell_guids.corpses, cellCoord, m, i_corpses, i_map);
+    if (std::unordered_set<Corpse*> const* corpses = i_map->GetCorpsesInCell(cellCoord.GetId()))
+    {
+        for (Corpse* corpse : *corpses)
+        {
+            corpse->AddToWorld();
+            i_grid.GetGridType(i_cell.CellX(), i_cell.CellY()).AddWorldObject(corpse);
+            ++i_corpses;
+        }
+    }
 }
 
 void ObjectGridLoader::LoadN(void)
 {
     i_gameObjects = 0; i_creatures = 0; i_corpses = 0;
     i_cell.data.Part.cell_y = 0;
-    for (unsigned int x=0; x < MAX_NUMBER_OF_CELLS; ++x)
+    for (uint32 x = 0; x < MAX_NUMBER_OF_CELLS; ++x)
     {
         i_cell.data.Part.cell_x = x;
-        for (unsigned int y=0; y < MAX_NUMBER_OF_CELLS; ++y)
+        for (uint32 y = 0; y < MAX_NUMBER_OF_CELLS; ++y)
         {
             i_cell.data.Part.cell_y = y;
 
@@ -180,11 +181,10 @@ void ObjectGridLoader::LoadN(void)
                 ObjectWorldLoader worker(*this);
                 TypeContainerVisitor<ObjectWorldLoader, WorldTypeMapContainer> visitor(worker);
                 i_grid.VisitGrid(x, y, visitor);
-                i_corpses += worker.i_corpses;
             }
         }
     }
-    TC_LOG_DEBUG(LOG_FILTER_MAPS, "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
+    TC_LOG_DEBUG("maps", "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
 }
 
 template<class T>
@@ -232,7 +232,9 @@ template void ObjectGridUnloader::Visit(CreatureMapType &);
 template void ObjectGridUnloader::Visit(GameObjectMapType &);
 template void ObjectGridUnloader::Visit(DynamicObjectMapType &);
 template void ObjectGridUnloader::Visit(CorpseMapType &);
+template void ObjectGridUnloader::Visit(AreaTriggerMapType &);
 template void ObjectGridCleaner::Visit(CreatureMapType &);
 template void ObjectGridCleaner::Visit<GameObject>(GameObjectMapType &);
 template void ObjectGridCleaner::Visit<DynamicObject>(DynamicObjectMapType &);
 template void ObjectGridCleaner::Visit<Corpse>(CorpseMapType &);
+template void ObjectGridCleaner::Visit<AreaTrigger>(AreaTriggerMapType &);

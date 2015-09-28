@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -39,21 +39,21 @@ class boss_the_beast : public CreatureScript
 public:
     boss_the_beast() : CreatureScript("boss_the_beast") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new boss_thebeastAI(creature);
     }
 
     struct boss_thebeastAI : public BossAI
     {
-        boss_thebeastAI(Creature* creature) : BossAI(creature, DATA_THE_BEAST) {}
+        boss_thebeastAI(Creature* creature) : BossAI(creature, DATA_THE_BEAST) { }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             _Reset();
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             _EnterCombat();
             events.ScheduleEvent(EVENT_FLAME_BREAK,     12 * IN_MILLISECONDS);
@@ -61,12 +61,12 @@ public:
             events.ScheduleEvent(EVENT_TERRIFYING_ROAR, 23 * IN_MILLISECONDS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             _JustDied();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -87,13 +87,21 @@ class MotionMaster //: private std::stack<MovementGenerator *>
 
         void pop()
         {
+            if (empty())
+                return;
+
             Impl[_top] = NULL;
-            while (!top())
+            while (!empty() && !top())
                 --_top;
         }
         void push(_Ty _Val) { ++_top; Impl[_top] = _Val; }
 
-        bool needInitTop() const { return _needInit[_top]; }
+        bool needInitTop() const
+        {
+            if (empty())
+                return false;
+            return _needInit[_top];
+        }
         void InitTop();
     public:
 
@@ -112,8 +120,16 @@ class MotionMaster //: private std::stack<MovementGenerator *>
 
         bool empty() const { return (_top < 0); }
         int size() const { return _top + 1; }
-        _Ty top() const { return Impl[_top]; }
-        _Ty GetMotionSlot(int slot) const { return Impl[slot]; }
+        _Ty top() const
+        {
+            ASSERT(!empty());
+            return Impl[_top];
+        }
+        _Ty GetMotionSlot(int slot) const
+        {
+            ASSERT(slot >= 0);
+            return Impl[slot];
+        }
 
         void DirectDelete(_Ty curr);
         void DelayedDelete(_Ty curr);
@@ -162,12 +178,13 @@ class MotionMaster //: private std::stack<MovementGenerator *>
         void MoveTakeoff(uint32 id, Position const& pos);
 
         void MoveCharge(float x, float y, float z, float speed = SPEED_CHARGE, uint32 id = EVENT_CHARGE, bool generatePath = false);
-        void MoveCharge(PathGenerator const& path);
+        void MoveCharge(PathGenerator const& path, float speed = SPEED_CHARGE);
         void MoveKnockbackFrom(float srcX, float srcY, float speedXY, float speedZ);
         void MoveJumpTo(float angle, float speedXY, float speedZ);
         void MoveJump(Position const& pos, float speedXY, float speedZ, uint32 id = EVENT_JUMP)
-            { MoveJump(pos.m_positionX, pos.m_positionY, pos.m_positionZ, speedXY, speedZ, id); };
+            { MoveJump(pos.m_positionX, pos.m_positionY, pos.m_positionZ, speedXY, speedZ, id); }
         void MoveJump(float x, float y, float z, float speedXY, float speedZ, uint32 id = EVENT_JUMP);
+        void MoveCirclePath(float x, float y, float z, float radius, bool clockwise, uint8 stepCount);
         void MoveFall(uint32 id = 0);
 
         void MoveSeekAssistance(float x, float y, float z);

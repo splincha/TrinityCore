@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,21 +21,22 @@
 
 #include "Object.h"
 #include "Map.h"
+#include "MapInstanced.h"
 #include "GridStates.h"
 #include "MapUpdater.h"
-
-#include <ace/Singleton.h>
-#include <ace/Thread_Mutex.h>
-
 
 class Transport;
 struct TransportCreatureProto;
 
 class MapManager
 {
-    friend class ACE_Singleton<MapManager, ACE_Thread_Mutex>;
-
     public:
+        static MapManager* instance()
+        {
+            static MapManager instance;
+            return &instance;
+        }
+
         Map* CreateBaseMap(uint32 mapId);
         Map* FindBaseNonInstanceMap(uint32 mapId) const;
         Map* CreateMap(uint32 mapId, Player* player);
@@ -107,15 +108,6 @@ class MapManager
 
         void DoDelayedMovesAndRemoves();
 
-        void LoadTransports();
-        void LoadTransportNPCs();
-
-        typedef std::set<Transport*> TransportSet;
-        TransportSet m_Transports;
-
-        typedef std::map<uint32, TransportSet> TransportMap;
-        TransportMap m_TransportsByMap;
-
         bool CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck = false);
         void InitializeVisibilityDistanceInfo();
 
@@ -134,14 +126,15 @@ class MapManager
 
         MapUpdater * GetMapUpdater() { return &m_updater; }
 
-    private:
-        typedef UNORDERED_MAP<uint32, Map*> MapMapType;
-        typedef std::vector<bool> InstanceIds;
+        template<typename Worker>
+        void DoForAllMaps(Worker&& worker);
 
-        // debugging code, should be deleted some day
-        void checkAndCorrectGridStatesArray();              // just for debugging to find some memory overwrites
-        GridState* i_GridStates[MAX_GRID_STATE];            // shadow entries to the global array in Map.cpp
-        int i_GridStateErrorCount;
+        template<typename Worker>
+        void DoForAllMapsWithMapId(uint32 mapId, Worker&& worker);
+
+private:
+        typedef std::unordered_map<uint32, Map*> MapMapType;
+        typedef std::vector<bool> InstanceIds;
 
         MapManager();
         ~MapManager();
@@ -155,7 +148,7 @@ class MapManager
         MapManager(const MapManager &);
         MapManager& operator=(const MapManager &);
 
-        ACE_Thread_Mutex Lock;
+        std::mutex _mapsLock;
         uint32 i_gridCleanUpDelay;
         MapMapType i_maps;
         IntervalTimer i_timer;
@@ -164,5 +157,45 @@ class MapManager
         uint32 _nextInstanceId;
         MapUpdater m_updater;
 };
-#define sMapMgr ACE_Singleton<MapManager, ACE_Thread_Mutex>::instance()
+
+template<typename Worker>
+void MapManager::DoForAllMaps(Worker&& worker)
+{
+    std::lock_guard<std::mutex> lock(_mapsLock);
+
+    for (auto& mapPair : i_maps)
+    {
+        Map* map = mapPair.second;
+        if (MapInstanced* mapInstanced = map->ToMapInstanced())
+        {
+            MapInstanced::InstancedMaps& instances = mapInstanced->GetInstancedMaps();
+            for (auto& instancePair : instances)
+                worker(instancePair.second);
+        }
+        else
+            worker(map);
+    }
+}
+
+template<typename Worker>
+inline void MapManager::DoForAllMapsWithMapId(uint32 mapId, Worker&& worker)
+{
+    std::lock_guard<std::mutex> lock(_mapsLock);
+
+    auto itr = i_maps.find(mapId);
+    if (itr != i_maps.end())
+    {
+        Map* map = itr->second;
+        if (MapInstanced* mapInstanced = map->ToMapInstanced())
+        {
+            MapInstanced::InstancedMaps& instances = mapInstanced->GetInstancedMaps();
+            for (auto& p : instances)
+                worker(p.second);
+        }
+        else
+            worker(map);
+    }
+}
+
+#define sMapMgr MapManager::instance()
 #endif

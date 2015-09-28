@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -28,7 +28,7 @@ class group_commandscript : public CommandScript
 public:
     group_commandscript() : CommandScript("group_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand groupCommandTable[] =
         {
@@ -57,7 +57,7 @@ public:
             return false;
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         Group* group = target->GetGroup();
@@ -95,7 +95,7 @@ public:
                 continue;
 
             // check online security
-            if (handler->HasLowerSecurity(player, 0))
+            if (handler->HasLowerSecurity(player, ObjectGuid::Empty))
                 return false;
 
             std::string plNameLink = handler->GetNameLink(player);
@@ -147,7 +147,7 @@ public:
     {
         Player* player = NULL;
         Group* group = NULL;
-        uint64 guid = 0;
+        ObjectGuid guid;
         char* nameStr = strtok((char*)args, " ");
 
         if (!handler->GetPlayerGroupAndGUIDByName(nameStr, player, group, guid))
@@ -173,7 +173,7 @@ public:
     {
         Player* player = NULL;
         Group* group = NULL;
-        uint64 guid = 0;
+        ObjectGuid guid;
         char* nameStr = strtok((char*)args, " ");
 
         if (!handler->GetPlayerGroupAndGUIDByName(nameStr, player, group, guid))
@@ -194,7 +194,7 @@ public:
     {
         Player* player = NULL;
         Group* group = NULL;
-        uint64 guid = 0;
+        ObjectGuid guid;
         char* nameStr = strtok((char*)args, " ");
 
         if (!handler->GetPlayerGroupAndGUIDByName(nameStr, player, group, guid))
@@ -220,8 +220,8 @@ public:
         Player* playerTarget = NULL;
         Group* groupSource = NULL;
         Group* groupTarget = NULL;
-        uint64 guidSource = 0;
-        uint64 guidTarget = 0;
+        ObjectGuid guidSource;
+        ObjectGuid guidTarget;
         char* nameplgrStr = strtok((char*)args, " ");
         char* nameplStr = strtok(NULL, " ");
 
@@ -245,7 +245,7 @@ public:
             return false;
         }
 
-        if (!groupSource->IsFull())
+        if (groupSource->IsFull())
         {
             handler->PSendSysMessage(LANG_GROUP_FULL);
             handler->SetSentErrorMessage(true);
@@ -260,33 +260,45 @@ public:
 
     static bool HandleGroupListCommand(ChatHandler* handler, char const* args)
     {
+        // Get ALL the variables!
         Player* playerTarget;
-        uint64 guidTarget;
+        uint32 phase = 0;
+        ObjectGuid guidTarget;
         std::string nameTarget;
+        std::string zoneName;
+        const char* onlineState = "";
 
-        uint32 parseGUID = MAKE_NEW_GUID(atol((char*)args), 0, HIGHGUID_PLAYER);
+        // Parse the guid to uint32...
+        ObjectGuid parseGUID = ObjectGuid::Create<HighGuid::Player>(strtoull(args, nullptr, 10));
 
-        if (sObjectMgr->GetPlayerNameByGUID(parseGUID, nameTarget))
+        // ... and try to extract a player out of it.
+        if (ObjectMgr::GetPlayerNameByGUID(parseGUID, nameTarget))
         {
-            playerTarget = sObjectMgr->GetPlayerByLowGUID(parseGUID);
+            playerTarget = ObjectAccessor::FindPlayer(parseGUID);
             guidTarget = parseGUID;
         }
+        // If not, we return false and end right away.
         else if (!handler->extractPlayerTarget((char*)args, &playerTarget, &guidTarget, &nameTarget))
             return false;
 
+        // Next, we need a group. So we define a group variable.
         Group* groupTarget = NULL;
+
+        // We try to extract a group from an online player.
         if (playerTarget)
             groupTarget = playerTarget->GetGroup();
 
+        // If not, we extract it from the SQL.
         if (!groupTarget)
         {
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GROUP_MEMBER);
-            stmt->setUInt32(0, guidTarget);
+            stmt->setUInt64(0, guidTarget.GetCounter());
             PreparedQueryResult resultGroup = CharacterDatabase.Query(stmt);
             if (resultGroup)
                 groupTarget = sGroupMgr->GetGroupByDbStoreId((*resultGroup)[0].GetUInt32());
         }
 
+        // If both fails, players simply has no party. Return false.
         if (!groupTarget)
         {
             handler->PSendSysMessage(LANG_GROUP_NOT_IN_GROUP, nameTarget.c_str());
@@ -294,12 +306,20 @@ public:
             return false;
         }
 
-        handler->PSendSysMessage(LANG_GROUP_TYPE, (groupTarget->isRaidGroup() ? "raid" : "party"));
+        // We get the group members after successfully detecting a group.
         Group::MemberSlotList const& members = groupTarget->GetMemberSlots();
+
+        // To avoid a cluster fuck, namely trying multiple queries to simply get a group member count...
+        handler->PSendSysMessage(LANG_GROUP_TYPE, (groupTarget->isRaidGroup() ? "raid" : "party"), members.size());
+        // ... we simply move the group type and member count print after retrieving the slots and simply output it's size.
+
+        // While rather dirty codestyle-wise, it saves space (if only a little). For each member, we look several informations up.
         for (Group::MemberSlotList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
         {
+            // Define temporary variable slot to iterator.
             Group::MemberSlot const& slot = *itr;
 
+            // Check for given flag and assign it to that iterator
             std::string flags;
             if (slot.flags & MEMBER_FLAG_ASSISTANT)
                 flags = "Assistant";
@@ -321,13 +341,37 @@ public:
             if (flags.empty())
                 flags = "None";
 
+            // Check if iterator is online. If is...
             Player* p = ObjectAccessor::FindPlayer((*itr).guid);
-            const char* onlineState = (p && p->IsInWorld()) ? "online" : "offline";
+            if (p)
+            {
+                // ... than, it prints information like "is online", where he is, etc...
+                onlineState = "online";
+                phase = (!p->IsGameMaster() ? p->GetPhaseMask() : -1);
 
+                AreaTableEntry const* area = GetAreaEntryByAreaID(p->GetAreaId());
+                if (area)
+                {
+                    AreaTableEntry const* zone = GetAreaEntryByAreaID(area->ParentAreaID);
+                    if (zone)
+                        zoneName = zone->AreaName_lang;
+                }
+            }
+            else
+            {
+                // ... else, everything is set to offline or neutral values.
+                zoneName    = "<ERROR>";
+                onlineState = "Offline";
+                phase       = 0;
+            }
+
+            // Now we can print those informations for every single member of each group!
             handler->PSendSysMessage(LANG_GROUP_PLAYER_NAME_GUID, slot.name.c_str(), onlineState,
-                GUID_LOPART(slot.guid), flags.c_str(), lfg::GetRolesString(slot.roles).c_str());
+                zoneName.c_str(), phase, slot.guid.ToString().c_str(), flags.c_str(),
+                lfg::GetRolesString(slot.roles).c_str());
         }
 
+        // And finish after every iterator is done.
         return true;
     }
 };

@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -20,7 +20,6 @@ set(scripts_STAT_SRCS
   Northrend/Ulduar/HallsOfLightning/boss_volkhan.cpp
   Northrend/Ulduar/HallsOfLightning/boss_loken.cpp
   Northrend/Ulduar/Ulduar/boss_general_vezax.cpp
-  Northrend/Ulduar/Ulduar/ulduar_teleporter.cpp
   Northrend/Ulduar/Ulduar/boss_thorim.cpp
   Northrend/Ulduar/Ulduar/boss_ignis.cpp
   Northrend/Ulduar/Ulduar/boss_algalon_the_observer.cpp
@@ -45,6 +44,7 @@ set(scripts_STAT_SRCS
   Northrend/ChamberOfAspects/ObsidianSanctum/instance_obsidian_sanctum.cpp
   Northrend/ChamberOfAspects/ObsidianSanctum/obsidian_sanctum.h
   Northrend/ChamberOfAspects/ObsidianSanctum/boss_sartharion.cpp
+  Northrend/ChamberOfAspects/ObsidianSanctum/obsidian_sanctum.cpp
   Northrend/ChamberOfAspects/RubySanctum/instance_ruby_sanctum.cpp
   Northrend/ChamberOfAspects/RubySanctum/ruby_sanctum.h
   Northrend/ChamberOfAspects/RubySanctum/ruby_sanctum.cpp
@@ -78,8 +78,7 @@ set(scripts_STAT_SRCS
   Northrend/Nexus/Oculus/boss_urom.cpp
   Northrend/Nexus/Oculus/oculus.cpp
   Northrend/Nexus/Oculus/instance_oculus.cpp
-  Northrend/Nexus/Nexus/boss_commander_kolurg.cpp
-  Northrend/Nexus/Nexus/boss_commander_stoutbeard.cpp
+  Northrend/Nexus/Nexus/boss_nexus_commanders.cpp
   Northrend/Nexus/Nexus/boss_ormorok.cpp
   Northrend/Nexus/Nexus/boss_magus_telestra.cpp
   Northrend/Nexus/Nexus/instance_nexus.cpp
@@ -167,6 +166,7 @@ set(scripts_STAT_SRCS
   Northrend/IcecrownCitadel/icecrown_citadel_teleport.cpp
   Northrend/IcecrownCitadel/boss_lord_marrowgar.cpp
   Northrend/IcecrownCitadel/boss_lady_deathwhisper.cpp
+  Northrend/IcecrownCitadel/boss_icecrown_gunship_battle.cpp
   Northrend/IcecrownCitadel/boss_deathbringer_saurfang.cpp
   Northrend/IcecrownCitadel/boss_festergut.cpp
   Northrend/IcecrownCitadel/boss_rotface.cpp
